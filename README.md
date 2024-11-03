@@ -30,7 +30,7 @@ the proxy count can be adjusted trough [terraform variables](https://github.com/
 
 **trevorproxy_serverless Installation**
 ```bash
-$ pip install trevorproxy_serverless
+$ sudo pipx install --global trevorproxy_serverless
 ```
 
 <br/>
