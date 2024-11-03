@@ -10,6 +10,7 @@ then
     terraform -chdir=infra apply -auto-approve -var "public_key=$public_key"
 elif [[ $1 == "down" ]]
 then
+    terraform -chdir=infra init
     terraform -chdir=infra destroy -auto-approve -var "public_key="
 else
     echo "USAGE: $0 [up | down]"
