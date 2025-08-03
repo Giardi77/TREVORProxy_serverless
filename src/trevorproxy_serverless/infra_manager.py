@@ -2,13 +2,16 @@ import json
 import os
 import subprocess
 import sys
+from importlib import resources
 
 
 def _run_terraform_command(command, public_key=None, profile=None, proxy_count=None):
     """
     Helper function to run terraform commands.
     """
-    tf_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "infra")
+    # When installed as a package, "infra" is package data.
+    with resources.path("trevorproxy_serverless", "infra") as tf_path:
+        tf_dir = str(tf_path)
 
     # Check if terraform is installed
     try:
@@ -104,18 +107,15 @@ def _create_iam_policy_and_user(target_profile):
     policy_arn = f"arn:aws:iam::{account_id}:policy/{policy_name}"
     user_name = target_profile  # "tps"
 
-    # Get the path to the policy JSON file, assuming it's in the current working directory
-    # where the 'trevorproxy_serverless' command is typically run from.
-    policy_json_path = os.path.join(os.getcwd(), f"{policy_name}.json")
-
-    if not os.path.exists(policy_json_path):
-        print(f"Error: Policy file not found at {policy_json_path}")
-        print("Please ensure 'tps-least-privilege-policy.json' is in the root of the repository.")
-        sys.exit(1)
-
+    # The policy file is packaged with the application. We use importlib.resources
+    # to get a path to it that the AWS CLI can access.
     print(f"Creating/updating IAM policy '{policy_name}'...")
     try:
-        subprocess.run(["aws", "--profile", admin_profile, "iam", "create-policy", "--policy-name", policy_name, "--policy-document", f"file://{policy_json_path}"], check=True, capture_output=True)
+        with resources.path("trevorproxy_serverless.data", f"{policy_name}.json") as policy_path:
+            policy_json_path = str(policy_path)
+            subprocess.run(
+                ["aws", "--profile", admin_profile, "iam", "create-policy", "--policy-name", policy_name, "--policy-document", f"file://{policy_json_path}"], check=True, capture_output=True
+            )
         print(f"Policy '{policy_name}' created.")
     except subprocess.CalledProcessError as e:
         if "EntityAlreadyExists" in e.stderr.decode():

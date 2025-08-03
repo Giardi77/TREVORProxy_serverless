@@ -35,4 +35,19 @@ terraform.rc
 
 __pycache__/
 dist/
+# Python build artifacts
+build/
+dist/
+*.egg-info/
+src/*.egg-info/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
 test-env/
+
+# Backup files
+*.bak

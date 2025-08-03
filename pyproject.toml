@@ -3,15 +3,18 @@ name = "trevorproxy_serverless"
 version = "0.0.2"
 description = "TREVORproxy wrapper that integrates with aws fargate based proxy cluster"
 readme = "README.md"
-requires-python = ">=3.6"
+requires-python = ">=3.8"
 dependencies = ["boto3", "threadlocal_aws", "trevorproxy"]
 
 [project.scripts]
 tps = "trevorproxy_serverless.cli:main"
 
 [project.urls]
-"repository" = "https://github.com/aristosMiliaressis/TREVORproxy_serverless/"
+"repository" = "https://github.com/Giardi77/TREVORproxy_serverless/"
 
+# The build-system is flit. Flit automatically includes non-python files
+# found inside the package directory in the built wheel. This includes
+# the .tf and .json files needed for the application to run.
 [build-system]
 requires = ["flit_core >=3.2,<4"]
 build-backend = "flit_core.buildapi"
