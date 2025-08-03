@@ -8,6 +8,7 @@ import time
 import uuid
 
 import boto3
+from botocore.exceptions import ProfileNotFound
 from threadlocal_aws.clients import ec2, ecs
 from trevorproxy.cli import main as trevorproxy
 
@@ -38,10 +39,35 @@ def run_command(args, profile=None):  # Renamed to run_command and accepts args
         print("Please run this command using 'sudo'. For example: sudo trevorproxy_serverless run ...")
         sys.exit(1)
 
-    session = boto3.Session(profile_name=profile)
+    # If running with sudo, boto3 won't find the user's AWS profile.
+    # We need to point it to the right place.
+    if "SUDO_USER" in os.environ:
+        home_dir = os.path.expanduser(f"~{os.environ['SUDO_USER']}")
+        aws_config_path = os.path.join(home_dir, ".aws", "config")
+        aws_credentials_path = os.path.join(home_dir, ".aws", "credentials")
+        if os.path.exists(aws_config_path):
+            os.environ["AWS_CONFIG_FILE"] = aws_config_path
+        if os.path.exists(aws_credentials_path):
+            os.environ["AWS_SHARED_CREDENTIALS_FILE"] = aws_credentials_path
+
+    # Ensure all boto3 clients (including those from threadlocal_aws) use the correct profile.
+    if profile:
+        os.environ["AWS_PROFILE"] = profile
+
+    try:
+        session = boto3.Session(profile_name=profile)
+        # Verify the identity to ensure we're using the correct profile
+        identity = session.client("sts").get_caller_identity()
+        print(f"INFO: Running as AWS principal: {identity['Arn']}")
+    except ProfileNotFound:
+        print(f"Error: The AWS profile '{profile}' could not be found.")
+        if "SUDO_USER" in os.environ:
+            print(f"Attempted to use credentials for user '{os.environ['SUDO_USER']}' but failed.")
+            print("Please ensure that the AWS config and credentials files exist in the correct home directory (~/.aws/).")
+        sys.exit(1)
     sqs = session.resource("sqs")
     queue = sqs.get_queue_by_name(QueueName="proxy-intents.fifo")
-    send_proxy_intent(queue)
+    send_proxy_intent()
 
     # setup graceful termination to remove proxy-intent message
     signal.signal(signal.SIGINT, terminate)
@@ -49,7 +75,7 @@ def run_command(args, profile=None):  # Renamed to run_command and accepts args
 
     # sliding window, to ensure messages\'t expire while the tool is running
     interval = int(queue.attributes["MessageRetentionPeriod"]) / 2
-    timer = threading.Timer(interval, send_proxy_intent, args=(queue,))
+    timer = threading.Timer(interval, send_proxy_intent)
     timer.start()
 
     ecs_client = ecs()
@@ -87,6 +113,7 @@ def main():
     infra_parser = subparsers.add_parser("infra", help="Manage TREVORproxy serverless infrastructure")
     infra_parser.add_argument("action", choices=["up", "down"], help="Action to perform: 'up' to deploy, 'down' to destroy")
     infra_parser.add_argument("--profile", default="tps", help="Use a specific AWS profile from your credentials file (default: tps)")
+    infra_parser.add_argument("--proxy-count", type=int, help="The number of SOCKS proxies to spin up.")
 
     # Run command parser
     run_parser = subparsers.add_parser("run", help="Run TREVORproxy with the serverless cluster")
@@ -100,9 +127,9 @@ def main():
 
     if args.command == "infra":
         if args.action == "up":
-            infra_manager.up(profile=args.profile)
+            infra_manager.up(profile=args.profile, proxy_count=args.proxy_count)
         elif args.action == "down":
-            infra_manager.down(profile=args.profile)
+            infra_manager.down(profile=args.profile, proxy_count=args.proxy_count)
     elif args.command == "run":
         run_command(args, profile=args.profile)
     else:

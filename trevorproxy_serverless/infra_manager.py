@@ -4,7 +4,7 @@ import subprocess
 import sys
 
 
-def _run_terraform_command(command, public_key=None, profile=None):
+def _run_terraform_command(command, public_key=None, profile=None, proxy_count=None):
     """
     Helper function to run terraform commands.
     """
@@ -36,6 +36,9 @@ def _run_terraform_command(command, public_key=None, profile=None):
 
     if profile:
         tf_vars.extend(["-var", f"profile={profile}"])
+
+    if proxy_count is not None:
+        tf_vars.extend(["-var", f"proxy_count={proxy_count}"])
 
     full_command = ["terraform", f"-chdir={tf_dir}", command, "-auto-approve"] + tf_vars
     print(f"Running: {' '.join(full_command)}")
@@ -170,7 +173,7 @@ def _create_iam_policy_and_user(target_profile):
     print(f"\nAWS profile '{target_profile}' setup complete. You can now use this profile.")
 
 
-def up(profile=None):
+def up(profile=None, proxy_count=None):
     """
     Deploys the TREVORproxy serverless infrastructure using Terraform.
     """
@@ -195,16 +198,16 @@ def up(profile=None):
     with open(public_key_path, "r") as f:
         public_key = f.read().strip()
 
-    _run_terraform_command("apply", public_key=public_key, profile=profile)
+    _run_terraform_command("apply", public_key=public_key, profile=profile, proxy_count=proxy_count)
     print("TREVORproxy serverless infrastructure deployment complete!")
 
 
-def down(profile=None):
+def down(profile=None, proxy_count=None):
     """
     Destroys the TREVORproxy serverless infrastructure using Terraform.
     """
     print("Destroying TREVORproxy serverless infrastructure...")
-    _run_terraform_command("destroy", public_key="", profile=profile)  # public_key is passed as empty for destroy
+    _run_terraform_command("destroy", public_key="", profile=profile, proxy_count=proxy_count)  # public_key is passed as empty for destroy
     print("TREVORproxy serverless infrastructure destruction complete!")
 
 

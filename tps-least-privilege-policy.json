@@ -2,6 +2,12 @@
   "Version": "2012-10-17",
   "Statement": [
     {
+      "Sid": "AWSServiceRoleForApplicationAutoScaling",
+      "Effect": "Allow",
+      "Action": ["iam:PassRole"],
+      "Resource": "arn:aws:iam::*:role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService"
+    },
+    {
       "Sid": "EC2FullControlOnDynamicResources",
       "Effect": "Allow",
       "Action": [
@@ -132,9 +138,11 @@
         "ecs:DeleteService",
         "ecs:UpdateService",
         "ecs:DescribeServices",
+        "ecs:ListTasks",
         "ecs:TagResource"
       ],
       "Resource": [
+        "arn:aws:ecs:*:*:container-instance/proxy-cluster/*",
         "arn:aws:ecs:*:*:cluster/proxy-cluster",
         "arn:aws:ecs:*:*:service/proxy-cluster/proxy-svc"
       ]
@@ -158,6 +166,7 @@
         "ecs:DescribeTasks",
         "ecs:RunTask",
         "ecs:StopTask",
+        "ecs:DescribeClusters",
         "ecs:TagResource"
       ],
       "Resource": [
