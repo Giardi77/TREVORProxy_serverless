@@ -111,7 +111,7 @@ def main():
 
     # Infra command parser
     infra_parser = subparsers.add_parser("infra", help="Manage TREVORproxy serverless infrastructure")
-    infra_parser.add_argument("action", choices=["up", "down"], help="Action to perform: 'up' to deploy, 'down' to destroy")
+    infra_parser.add_argument("action", choices=["up", "down", "clean"], help="Action to perform: 'up' to deploy, 'down' to destroy, 'clean' to destroy and remove local state")
     infra_parser.add_argument("--profile", default="tps", help="Use a specific AWS profile from your credentials file (default: tps)")
     infra_parser.add_argument("--proxy-count", type=int, help="The number of SOCKS proxies to spin up.")
 
@@ -130,6 +130,8 @@ def main():
             infra_manager.up(profile=args.profile, proxy_count=args.proxy_count)
         elif args.action == "down":
             infra_manager.down(profile=args.profile, proxy_count=args.proxy_count)
+        elif args.action == "clean":
+            infra_manager.clean(profile=args.profile, proxy_count=args.proxy_count)
     elif args.command == "run":
         run_command(args, profile=args.profile)
     else:

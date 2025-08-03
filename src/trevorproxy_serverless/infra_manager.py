@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import subprocess
 import sys
 from importlib import resources
@@ -209,6 +210,47 @@ def down(profile=None, proxy_count=None):
     print("Destroying TREVORproxy serverless infrastructure...")
     _run_terraform_command("destroy", public_key="", profile=profile, proxy_count=proxy_count)  # public_key is passed as empty for destroy
     print("TREVORproxy serverless infrastructure destruction complete!")
+
+
+def clean(profile=None, proxy_count=None):
+    """
+    Destroys infrastructure and cleans up local Terraform state.
+    """
+    print("--- Starting complete cleanup ---")
+
+    # First, run the 'down' command to destroy cloud resources. The script will
+    # halt if this fails, preserving the local state for a retry.
+    print("Step 1: Tearing down cloud infrastructure...")
+    down(profile=profile, proxy_count=proxy_count)
+
+    # Second, clean up the local terraform state files.
+    print("\nStep 2: Cleaning up local Terraform state...")
+    try:
+        with resources.path("trevorproxy_serverless", "infra") as tf_path:
+            tf_dir = str(tf_path)
+
+            files_to_remove = [
+                os.path.join(tf_dir, "terraform.tfstate"),
+                os.path.join(tf_dir, "terraform.tfstate.backup"),
+                os.path.join(tf_dir, ".terraform.lock.hcl"),
+            ]
+
+            for file_path in files_to_remove:
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
+                    print(f"Removed file: {file_path}")
+
+            terraform_dir = os.path.join(tf_dir, ".terraform")
+            if os.path.isdir(terraform_dir):
+                shutil.rmtree(terraform_dir)
+                print(f"Removed directory: {terraform_dir}")
+
+            print("Local state cleanup successful.")
+
+    except Exception as e:
+        print(f"Error during local state cleanup: {e}")
+
+    print("\n--- Cleanup process finished ---")
 
 
 if __name__ == "__main__":
