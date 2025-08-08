@@ -123,6 +123,7 @@
         "sqs:ReceiveMessage",
         "sqs:DeleteMessage",
         "sqs:listqueuetags",
+        "sqs:changemessagevisibility",
         "sqs:tagqueue"
       ],
       "Resource": "arn:aws:sqs:*:*:proxy-intents.fifo"

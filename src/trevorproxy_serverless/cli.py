@@ -5,6 +5,7 @@ import signal
 import sys
 import threading
 import time
+import uuid
 
 import boto3
 from botocore.exceptions import ProfileNotFound
@@ -14,63 +15,45 @@ from trevorproxy.cli import main as trevorproxy
 from . import infra_manager
 
 queue = None
-intent_message = None
-keepalive_stop_event = threading.Event()
-keepalive_thread = None
+intent_sender_stop_event = threading.Event()
+intent_sender_thread = None
 
 
 def terminate(sig, frame):
-    cleanup_intent()
+    stop_intent_sender()
     exit(0)
 
 
-def acquire_proxy_intent():
-    """Ensure exactly one intent message is present and keep a handle to it.
+def _send_new_intent():
+    dedup_id = str(uuid.uuid4())
+    group_id = "proxy-intents-group"
+    queue.send_message(MessageBody="{}", MessageDeduplicationId=dedup_id, MessageGroupId=group_id)
 
-    Strategy: receive a visible message if present; otherwise send one and then receive it.
-    We hold the message in-flight and periodically extend its visibility timeout.
+
+def start_intent_sender():
+    """Start background thread that periodically sends a fresh intent message.
+
+    Messages are not deleted; they expire per queue retention, ensuring natural scale-down on crash.
     """
-    global intent_message
-    # Try to receive an existing message first
-    messages = queue.receive_messages(MaxNumberOfMessages=1, WaitTimeSeconds=0)
-    if not messages:
-        print("Sending proxy intent.")
-        # Use fixed group/dedup to avoid flooding the queue
-        # Note: FIFO deduplication window is ~5 minutes; we will hold the message in-flight anyway
-        queue.send_message(
-            MessageBody="{}",
-            MessageDeduplicationId="singleton-intent",
-            MessageGroupId="proxy-intents-group",
-        )
-        messages = queue.receive_messages(MaxNumberOfMessages=1, WaitTimeSeconds=0)
-    if messages:
-        intent_message = messages[0]
+    retention_seconds = int(queue.attributes.get("MessageRetentionPeriod", 900))
+    interval_seconds = max(10, retention_seconds - 100)
+
+    def loop():
+        while not intent_sender_stop_event.is_set():
+            try:
+                print("Sending proxy intent.")
+                _send_new_intent()
+            except Exception as e:
+                print(f"WARN: failed to send proxy intent: {e}")
+            intent_sender_stop_event.wait(interval_seconds)
+
+    global intent_sender_thread
+    intent_sender_thread = threading.Thread(target=loop, daemon=True)
+    intent_sender_thread.start()
 
 
-def keep_intent_alive():
-    """Background loop that extends the visibility timeout of the intent message."""
-    # Default SQS visibility timeout is 30 seconds unless configured otherwise
-    visibility_timeout = int(queue.attributes.get("VisibilityTimeout", 30))
-    # Refresh a bit earlier than expiry
-    interval_seconds = max(1, visibility_timeout // 2)
-    while not keepalive_stop_event.is_set():
-        try:
-            if intent_message is not None:
-                intent_message.change_visibility(VisibilityTimeout=visibility_timeout)
-        except Exception as e:
-            print(f"WARN: failed to extend intent visibility: {e}")
-        # Sleep with stop-event awareness
-        keepalive_stop_event.wait(interval_seconds)
-
-
-def cleanup_intent():
-    """Stop keepalive and delete the intent message if we hold one."""
-    keepalive_stop_event.set()
-    try:
-        if intent_message is not None:
-            intent_message.delete()
-    except Exception as e:
-        print(f"WARN: failed to delete intent message: {e}")
+def stop_intent_sender():
+    intent_sender_stop_event.set()
 
 
 def run_command(args, profile=None):  # Renamed to run_command and accepts args
@@ -109,16 +92,15 @@ def run_command(args, profile=None):  # Renamed to run_command and accepts args
         sys.exit(1)
     sqs = session.resource("sqs")
     queue = sqs.get_queue_by_name(QueueName="proxy-intents.fifo")
-    acquire_proxy_intent()
+    print("Sending proxy intent.")
+    _send_new_intent()
 
     # setup graceful termination to remove proxy-intent message
     signal.signal(signal.SIGINT, terminate)
     signal.signal(signal.SIGTERM, terminate)
 
-    # Start a background keepalive to extend the visibility timeout
-    global keepalive_thread
-    keepalive_thread = threading.Thread(target=keep_intent_alive, daemon=True)
-    keepalive_thread.start()
+    # Start periodic intent sender
+    start_intent_sender()
 
     ecs_client = ecs()
     cluster = ecs_client.describe_clusters(clusters=["proxy-cluster"])["clusters"][0]
@@ -146,7 +128,7 @@ def run_command(args, profile=None):  # Renamed to run_command and accepts args
     try:
         trevorproxy()
     finally:
-        cleanup_intent()
+        stop_intent_sender()
 
 
 def main():
