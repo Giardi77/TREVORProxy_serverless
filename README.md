@@ -12,25 +12,42 @@ Sets up an autoscaling cluster of SOCKS proxies to use along with [TREVORproxy](
 - if the cli is terminated non gracefully, the message will remain in the queue until the message retention period of the queue passes
 - while the cli is running it is using a sliding window approach to ensure the proxy intent message will not expire while the cli is running.
 
-the proxy count can be adjusted trough [terraform variables](https://github.com/aristosMiliaressis/TREVORproxy_serverless/blob/master/infra/variables.tf).
+the proxy count can be adjusted through [terraform variables](https://github.com/Giardi77/TREVORproxy_serverless/blob/main/src/trevorproxy_serverless/infra/variables.tf).
 
 <p align="center">
-  <img src="https://github.com/aristosMiliaressis/TREVORproxy_serverless/blob/master/img/demo.png?raw=true">
+  <img src="https://github.com/Giardi77/TREVORproxy_serverless/blob/main/img/demo.png?raw=true">
 </p>
 
 <br/>
 
-**Dependencies for infra.sh**
+**Dependencies**
 - aws cli (configured with enough permissions)
 - terraform
 - docker
-- jq
+- uv (for installation)
 
 <br/>
 
 **trevorproxy_serverless Installation**
 ```bash
-$ sudo pipx install --global trevorproxy_serverless
+$ pipx install git+https://github.com/Giardi77/TREVORproxy_serverless.git
+```
+
+<br/>
+
+**Usage**
+```bash
+# Deploy infrastructure
+$ tps infra up --proxy-count 5
+
+# Run TREVORproxy with the cluster
+$ sudo tps run 
+
+# Destroy infrastructure
+$ tps infra down 
+
+# Clean infrastructure and remove local state
+$ tps infra clean 
 ```
 
 <br/>
@@ -48,5 +65,5 @@ EU (Stockholm),
 Asia Pacific (Tokyo)
 
 <p align="center">
-  <img src="https://github.com/aristosMiliaressis/TREVORproxy_serverless/blob/master/img/cost_calc.png?raw=true">
+  <img src="https://github.com/Giardi77/TREVORproxy_serverless/blob/main/img/cost_calc.png?raw=true">
 </p>
