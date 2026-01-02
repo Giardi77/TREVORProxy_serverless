@@ -85,6 +85,13 @@ def run_command(args, profile=None):  # Renamed to run_command and accepts args
     if profile:
         os.environ["AWS_PROFILE"] = profile
 
+    # Expand the SSH key path correctly when running with sudo
+    if "SUDO_USER" in os.environ and args.key.startswith("~"):
+        user_home = os.path.expanduser(f"~{os.environ['SUDO_USER']}")
+        key_path = user_home + args.key[1:]
+    else:
+        key_path = os.path.expanduser(args.key)
+
     try:
         session = boto3.Session(profile_name=profile)
         # Verify the identity to ensure we're using the correct profile
@@ -152,7 +159,7 @@ def run_command(args, profile=None):  # Renamed to run_command and accepts args
         args.listen_address,
         "ssh",
         "-k",
-        args.key,
+        key_path,
         "--base-port",
         str(args.base_port),
     ]
