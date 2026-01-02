@@ -1,12 +1,7 @@
 # AGENTS.md
 
-## Build/Lint/Test Commands
-- Build: `uv build`
-- Install: `uv pip install -e .`
+## Dev Commands
 - Run: `uv run tps <command>`
-- Lint: None configured (consider adding ruff: `ruff check .`)
-- Test: No tests present (run manually with `python -m pytest` if added)
-- Single test: N/A (add tests in `tests/` directory)
 
 ## Code Style Guidelines
 - **Imports**: Standard library first, then third-party, alphabetical within groups
